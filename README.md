@@ -1,3 +1,5 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/34niek0gckruqqlq/branch/master?svg=true)](https://ci.appveyor.com/project/MartinPugh/publish-psmodule/branch/master)
+
 # Publish-PSModule
 Simple script for creating a PowerShell module from existing function files
 
@@ -6,7 +8,9 @@ Put a collection of your favorite functions into their own PS1 files create a Po
 
 *Private* - if Private is in the path name, all functions found in this path will be not be exported and will not
 			be available to the user. However, they will be available as internal functions to the module.
+			
 *Exclude* - any files found with Exclude in the path name will not be included in the module at all.
+
 *Tests*   - any files found with Tests in the path name will not be included in the module at all (put your Pester
 			tests here).
 
