@@ -45,9 +45,9 @@
 #>
 [CmdletBinding()]
 Param (
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     [ValidateScript({ Test-Path $_ })]
-    [string]$Path = "C:\Dropbox\github\Publish-PSModule\Test-Module",
+    [string]$Path,
     [string]$ModuleName
 )
 Write-Verbose "$(Get-Date): Publish-Module.ps1 started"
@@ -117,7 +117,12 @@ ForEach ($File in $Files)
 $ManifestPath = Join-Path $Path -ChildPath "$ModuleName.psd1"
 If (Test-Path $ManifestPath)
 {
-    Update-ModuleManifest -Path $ManifestPath -PowerShellVersion $HighVersion -FunctionsToExport ($FunctionNames | Where Private -eq $false | Select -ExpandProperty Name)
+    $Manifest = @{
+        Path = $ManifestPath
+        PowerShellVersion = $HighVersion
+        FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
+    }
+    Update-ModuleManifest @Manifest
 }
 Else
 {
