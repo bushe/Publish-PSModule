@@ -50,7 +50,7 @@ Param (
     [string]$Path,
     [string]$ModuleName
 )
-Write-Verbose "$(Get-Date): Publish-Module.ps1 started"
+Write-Verbose "$(Get-Date): Publish-PSModule.ps1 started"
 
 If (-not $ModuleName)
 {
@@ -61,6 +61,7 @@ $Module = New-Object -TypeName System.Collections.ArrayList
 $FunctionNames = New-Object -TypeName System.Collections.ArrayList
 $HighVersion = [version]"2.0"
 
+Write-Verbose "$(Get-Date): Searching for ps1 files and include.txt for module"
 #Retrieve Include.txt file(s)
 $Files = Get-ChildItem $Path\Include.txt -Recurse | Sort FullName
 ForEach ($File in $Files)
@@ -114,6 +115,7 @@ ForEach ($File in $Files)
 }
 
 #Create the manifest file
+Write-Verbose "$(Get-Date): Creating/Updating module manifest and module file"
 $ManifestPath = Join-Path $Path -ChildPath "$ModuleName.psd1"
 If (Test-Path $ManifestPath)
 {
@@ -139,4 +141,5 @@ Else
 $ModulePath = Join-Path -Path $Path -ChildPath "$ModuleName.psm1"
 $Module | Out-File $ModulePath -Encoding ascii
 
-Write-Verbose "$(Get-Date): Module created at: $Path as $ModuleName"
+Write-Verbose "Module created at: $Path as $ModuleName" -Verbose
+Write-Verbose "$(Get-Date): Publish-PSModule completed."
