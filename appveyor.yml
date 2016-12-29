@@ -7,6 +7,9 @@ build:
 install:
   - cinst pester
 
+build: 
+  - ps: Write-Host $Env:APPVEYOR_BUILD_FOLDER
+  
 test_script:
   - ps: Set-Location -Path $Env:APPVEYOR_BUILD_FOLDER
   - ps: $res = Invoke-Pester -OutputFormat NUnitXml -OutputFile .\TestsResults.xml -PassThru
