@@ -1,13 +1,13 @@
 version: 1.0.{build}
 image: WMF 5
 
-build:
-  verbosity: detailed
-  
 install:
   - cinst pester
 
-build: 
+build:
+  verbosity: detailed
+  
+build_script:
   - ps: Write-Host $Env:APPVEYOR_BUILD_FOLDER
   
 test_script:
