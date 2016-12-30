@@ -1,6 +1,11 @@
-﻿$ScriptPath = $PSScriptRoot
+﻿#Set up
+$ScriptPath = $PSScriptRoot
+. $ScriptPath\Publish-PSModule.ps1
+
+#Clean up
 Remove-Item $ScriptPath\Test-Module -Recurse -Force -ErrorAction SilentlyContinue
 
+#Testing
 Describe "Testing Publish-PSModule module builds" {
     Context "Scratch build" {
         New-Item $ScriptPath\Test-Module\Source -ItemType Directory
@@ -35,7 +40,7 @@ Function check-m2e{ <#this is a test#> }
 "@
         $Module | Out-File $ScriptPath\Test-Module\Source\Public\PublicFunction.ps1
         It "Initial Build" {
-            { & $ScriptPath\Publish-PSModule.ps1 -Path $ScriptPath\Test-Module } | Should Not Throw
+            { Publish-PSModule -Path $ScriptPath\Test-Module } | Should Not Throw
         }
         It "Manifest exists" {
             Test-Path $ScriptPath\Test-Module\Test-Module.psd1 | Should Be True
@@ -76,7 +81,13 @@ Function Test2
 "@
         $Module | Out-File $ScriptPath\Test-Module\Source\Public\PublicFunction.ps1
         It "Update Build" {
-            { & $ScriptPath\Publish-PSModule.ps1 -Path $ScriptPath\Test-Module } | Should Not Throw
+            { Publish-PSModule -Path $ScriptPath\Test-Module } | Should Not Throw
+        }
+        It "Manifest exists" {
+            Test-Path $ScriptPath\Test-Module\Test-Module.psd1 | Should Be True
+        }
+        It "Module exists" {
+            Test-Path $ScriptPath\Test-Module\Test-Module.psm1 | Should Be True
         }
         It "Should only be 2 functions now" {
             $Search = Select-String -Path $ScriptPath\Test-Module\Test-Module.psd1 -Pattern "FunctionsToExport = 'Test1', 'Test2'"
@@ -101,7 +112,7 @@ Function Test2
     }
     Context "Specify Module Name build" {
         It "Update Build" {
-            { & $ScriptPath\Publish-PSModule.ps1 -Path $ScriptPath\Test-Module -ModuleName MyModule } | Should Not Throw
+            { Publish-PSModule -Path $ScriptPath\Test-Module -ModuleName MyModule } | Should Not Throw
         }
         It "Manifest exists" {
             Test-Path $ScriptPath\Test-Module\MyModule.psd1 | Should Be True
@@ -142,7 +153,7 @@ Function Test1
 "@
         $Module | Out-File $ScriptPath\Test-Module\Source\Public\PublicFunction.ps1
         It "Duplicate function name build should fail" {
-            { & $ScriptPath\Publish-PSModule.ps1 -Path $ScriptPath\Test-Module } | Should Throw
+            { Publish-PSModule -Path $ScriptPath\Test-Module } | Should Throw
         }
     }
 }
