@@ -82,8 +82,8 @@ Function Test2
             $Search = Select-String -Path $ScriptPath\Test-Module\Test-Module.psd1 -Pattern "FunctionsToExport = 'Test1', 'Test2'"
             $Search.Count | Should Be 1
         }
-        It "PowerShellVersion set to 2.0" {
-            $Search = Select-String -Path $ScriptPath\Test-Module\Test-Module.psd1 -Pattern "PowerShellVersion = '2.0'"
+        It "PowerShellVersion set to 3.0" {
+            $Search = Select-String -Path $ScriptPath\Test-Module\Test-Module.psd1 -Pattern "PowerShellVersion = '3.0'"
             $Search.Count | Should Be 1
         }
         It "Private function exists in module" {

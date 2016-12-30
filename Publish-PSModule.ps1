@@ -119,6 +119,11 @@ Write-Verbose "$(Get-Date): Creating/Updating module manifest and module file"
 $ManifestPath = Join-Path $Path -ChildPath "$ModuleName.psd1"
 If (Test-Path $ManifestPath)
 {
+    $OldManifest = Invoke-Expression -Command (Get-Content $ManifestPath -Raw)
+    If ([version]$OldManifest.PowerShellVersion -gt $HighVersion)
+    {
+        $HighVersion = [version]$OldManifest.PowerShellVersion
+    }
     $Manifest = @{
         Path = $ManifestPath
         PowerShellVersion = $HighVersion
