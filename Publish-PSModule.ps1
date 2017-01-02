@@ -34,7 +34,7 @@ Function Publish-PSModule
         to in Path.
     
     .PARAMETER Passthru
-        Will produce an output object with information about your newly created module
+        Will produce an object with information about the newly created module
 
     .INPUTS
         None
@@ -69,6 +69,8 @@ Function Publish-PSModule
             1.0             Initial Release
             1.0.9           Moved from RegEx to AST for function parsing
             1.0.10          Updated comment based help.  Added Passthru parameter
+            1.0.11          Updated comment based help.  Exclude psake.ps1, build.ps1 and .psdeploy. from function import.
+                            Added BuildVersion
 
     .LINK
         https://github.com/martin9700/Publish-PSModule
@@ -79,6 +81,7 @@ Function Publish-PSModule
         [ValidateScript({ Test-Path $_ })]
         [string]$Path,
         [string]$ModuleName,
+        [version]$BuildVersion,
         [switch]$Passthru
     )
     Write-Verbose "$(Get-Date): Publish-PSModule.ps1 started"
@@ -103,7 +106,7 @@ Function Publish-PSModule
     }
 
     #Retrieve ps1 files
-    $Files = Get-ChildItem $Path\*.ps1 -File -Recurse | Where FullName -NotMatch "Exclude|Tests" | Sort FullName
+    $Files = Get-ChildItem $Path\*.ps1 -File -Recurse | Where FullName -NotMatch "Exclude|Tests|psake\.ps1|build\.ps1|\.psdeploy\." | Sort FullName
     ForEach ($File in $Files)
     {
         $Raw = Get-Content $File -Raw
@@ -160,6 +163,10 @@ Function Publish-PSModule
             PowerShellVersion = $HighVersion
             FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
         }
+        If ($BuildVersion)
+        {
+            $Manifest.Add("ModuleVersion",$BuildVersion)
+        }
         Update-ModuleManifest @Manifest
     }
     Else
@@ -169,6 +176,10 @@ Function Publish-PSModule
             Path = $ManifestPath
             PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
             FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
+        }
+        If ($BuildVersion)
+        {
+            $Manifest.Add("ModuleVersion",$BuildVersion)
         }
         New-ModuleManifest @Manifest
     }
