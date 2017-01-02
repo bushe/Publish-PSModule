@@ -33,6 +33,9 @@ Function Publish-PSModule
         What you want to call your module. By default the module will be named after the folder you point
         to in Path.
     
+    .PARAMETER BuildVersion
+        Update the ModuleVersion field in the module manifest
+
     .PARAMETER Passthru
         Will produce an object with information about the newly created module
 
