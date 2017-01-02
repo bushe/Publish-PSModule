@@ -141,6 +141,30 @@ Function Test2
             $Search.Count | Should Be 1
         }
     }
+    Context "Use Passthru parameter build" {
+        It "Update Build with Passthru" {
+            { Publish-PSModule -Path $ScriptPath\Test-Module -Passthru | Export-Clixml $ScriptPath\Test-Module\Result.xml } | Should Not Throw
+        }
+        $Result = Import-Clixml $ScriptPath\Test-Module\Result.xml
+        It "Module name is ""Test-Module""" {
+            $Result.Name | Should Be "Test-Module"
+        }
+        It "Path is ""$ScriptPath\Test-Module""" {
+            $Result.Path | Should Be "$ScriptPath\Test-Module"
+        }
+        It "ManifestPath is ""$ScriptPath\Test-Module\Test-Module.psd1""" {
+            $Result.ManifestPath | Should Be "$ScriptPath\Test-Module\Test-Module.psd1"
+        }
+        It "ModulePath is ""$ScriptPath\Test-Module\Test-Module.psm1""" {
+            $Result.ModulePath | Should Be "$ScriptPath\Test-Module\Test-Module.psm1"
+        }
+        It "Should be 2 public functions" {
+            $Result.PublicFunctions.Count | Should Be 2
+        }
+        It "Should be 1 private function" {
+            $Result.PrivateFunctions.Count | Should Be 1
+        }
+    }
     Context "Duplicate function name build" {
         $Module = @"
 Function Test1 {

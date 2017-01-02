@@ -10,11 +10,16 @@ Function Publish-PSModule
         the path name contains one of the below key names, all functions will be exported by the module and available to the
         user.
 
-        *Private* - if Private is in the path name, all functions found in this path will be not be exported and will not
-                    be available to the user. However, they will be available as internal functions to the module.
-        *Exclude* - any files found with Exclude in the path name will not be included in the module at all.
-        *Tests*   - any files found with Tests in the path name will not be included in the module at all (put your Pester
-                    tests here).
+        Include.txt - Sometimes you want some code to set the environment for your module, or to do some task.  While not 
+                      necessary, if you want the code to appear at the top of the module you can use Include.txt to accomplish
+                      this.  Do not place any functions in this file because script will not process it, it just puts it
+                      into the module file.
+
+        *Private*   - if Private is in the path name, all functions found in this path will be not be exported and will not
+                      be available to the user. However, they will be available as internal functions to the module.
+        *Exclude*   - any files found with Exclude in the path name will not be included in the module at all.
+        *Tests*     - any files found with Tests in the path name will not be included in the module at all (put your Pester
+                      tests here).
 
         Manifest file for the module will also be created with the correct PowerShell version requirement (assuming you
         specified this with the "#requires -Version" code in your functions).
@@ -27,12 +32,32 @@ Function Publish-PSModule
     .PARAMETER ModuleName
         What you want to call your module. By default the module will be named after the folder you point
         to in Path.
+    
+    .PARAMETER Passthru
+        Will produce an output object with information about your newly created module
 
     .INPUTS
         None
+    
     .OUTPUTS
-        None
+        [PSCustomObject]
+    
     .EXAMPLE
+        .\Publish-PSModule.ps1 -Path c:\Test-Module 
+
+        Module will be named Test-Module (.psm1 and .psd1) and will include all functions in that path.
+
+    .EXAMPLE
+        .\Publish-PSModule.ps1 -Path c:\Test-Module -ModuleName Make-GreatStuff -Passthru
+
+        Module will be named Make-GreatStuff.  Returned object will be:
+
+        Name            : Make-GreatStuff
+        Path            : c:\Test-Module
+        ManifestPath    : c:\Test-Module\Test-Module.psd1
+        ModulePath      : c:\Test-Module\Test-Module.psm1
+        PublicFunctions : {Test1, Test2}
+        PrivateFunctions: {Test3}
 
     .NOTES
         Author:             Martin Pugh
@@ -42,6 +67,9 @@ Function Publish-PSModule
       
         Changelog:
             1.0             Initial Release
+            1.0.9           Moved from RegEx to AST for function parsing
+            1.0.10          Updated comment based help.  Added Passthru parameter
+
     .LINK
         https://github.com/martin9700/Publish-PSModule
     #>
@@ -50,7 +78,8 @@ Function Publish-PSModule
         [Parameter(Mandatory=$true)]
         [ValidateScript({ Test-Path $_ })]
         [string]$Path,
-        [string]$ModuleName
+        [string]$ModuleName,
+        [switch]$Passthru
     )
     Write-Verbose "$(Get-Date): Publish-PSModule.ps1 started"
 
@@ -147,6 +176,19 @@ Function Publish-PSModule
     #Save the Module file
     $ModulePath = Join-Path -Path $Path -ChildPath "$ModuleName.psm1"
     $Module | Out-File $ModulePath -Encoding ascii
+
+    #Passthru
+    If ($Passthru)
+    {
+        [PSCustomObject]@{
+            Name             = $ModuleName
+            Path             = $Path
+            ManifestPath     = $ManifestPath
+            ModulePath       = $ModulePath
+            PublicFunctions  = @($FunctionNames | Where Private -eq $false | Select -ExpandProperty Name)
+            PrivateFunctions = @($FunctionNames | Where Private -eq $true | Select -ExpandProperty Name)
+        }
+    }
 
     Write-Verbose "Module created at: $Path as $ModuleName" -Verbose
     Write-Verbose "$(Get-Date): Publish-PSModule completed."
