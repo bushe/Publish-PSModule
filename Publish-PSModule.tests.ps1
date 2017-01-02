@@ -156,6 +156,25 @@ Function Test1
             { Publish-PSModule -Path $ScriptPath\Test-Module } | Should Throw
         }
     }
+    Context "Error in function build" {
+        $Module = @"
+Function Test1 {
+    #this is a test function
+}
+Function Test2
+{
+    If ($Something
+    {
+        $Something ++
+    }
+    #Duplicate Function Name
+}
+"@
+        $Module | Out-File $ScriptPath\Test-Module\Source\Public\PublicFunction.ps1
+        It "Error in function Test2 should fail" {
+            { Publish-PSModule -Path $ScriptPath\Test-Module } | Should Throw
+        }
+    }
 }
 
 #Clean up!

@@ -61,6 +61,7 @@ Function Publish-PSModule
 
     $Module = New-Object -TypeName System.Collections.ArrayList
     $FunctionNames = New-Object -TypeName System.Collections.ArrayList
+    $FunctionPredicate = { ($args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst]) }
     $HighVersion = [version]"2.0"
 
     Write-Verbose "$(Get-Date): Searching for ps1 files and include.txt for module"
@@ -76,7 +77,7 @@ Function Publish-PSModule
     $Files = Get-ChildItem $Path\*.ps1 -File -Recurse | Where FullName -NotMatch "Exclude|Tests" | Sort FullName
     ForEach ($File in $Files)
     {
-        $Raw = Get-Content $File
+        $Raw = Get-Content $File -Raw
         $Private = $false
         If ($File.DirectoryName -like "*Private*")
         {
@@ -84,35 +85,34 @@ Function Publish-PSModule
         }
         $null = $Module.Add($Raw)
 
-        ForEach ($Line in $Raw)
+        #Parse out the function names
+        #Thanks Zachary Loeber
+        $ParseError = $null
+        $Tokens = $null
+        $AST = [System.Management.Automation.Language.Parser]::ParseInput($Raw, [ref]$Tokens, [ref]$ParseError)
+        If ($ParseError)
         {
-            If ($Line -match "^( *|\t*)Function (?<Name>.*)")
+            Write-Error "Unable to parse $($File.FullName) because ""$ParseError""" -ErrorAction Stop
+        }
+
+        ForEach ($Name in ($AST.FindAll($FunctionPredicate, $true) | Select -ExpandProperty Name))
+        {
+            If ($FunctionNames.Name -contains $Name)
             {
-                If ($Matches.Name -like "*{*")
-                {
-                    $Matches.Name = $Matches.Name.Substring(0,$Matches.Name.IndexOf("{"))
-                }
-                If ($FunctionNames.Name -contains $Matches.Name.Trim())
-                {
-                    Write-Error "Your module contains multiple functions with the same name: $($Matches.Name.Trim())" -ErrorAction Stop
-                }
-                Else
-                {
-                    $null = $FunctionNames.Add([PSCustomObject]@{
-                        Name = $Matches.Name.Trim()
-                        Private = $Private
-                    })
-                }
+                Write-Error "Your module has duplicate function names: $Name.  Duplicate found in $($File.FullName)" -ErrorAction Stop
             }
-            ElseIf ($Line -match "#requires -version (?<Version>.*)")
+            Else
             {
-                $temp = $Matches.Version + ".0"
-                $Version = [version]$temp
-                If ($Version -gt $HighVersion)
-                {
-                    $HighVersion = $Version
-                }
+                $null = $FunctionNames.Add([PSCustomObject]@{
+                    Name = $Name
+                    Private = $Private
+                })
             }
+        }
+
+        If ($AST.ScriptRequirements.RequiredPSVersion -gt $HighVersion)
+        {
+            $HighVersion = $AST.ScriptRequirements.RequiredPSVersion
         }
     }
 
