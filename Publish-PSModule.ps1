@@ -1,5 +1,47 @@
-Function Publish-PSModule
-{
+
+<#PSScriptInfo
+
+.VERSION 1.0.12
+
+.GUID 2e26156a-10d3-4357-b676-616672b66558
+
+.AUTHOR Martin Pugh
+
+.COMPANYNAME 
+
+.COPYRIGHT 
+
+.TAGS 
+
+.LICENSEURI https://github.com/martin9700/Publish-PSModule/blob/master/LICENSE
+
+.PROJECTURI https://github.com/martin9700/Publish-PSModule
+
+.ICONURI 
+
+.EXTERNALMODULEDEPENDENCIES 
+
+.REQUIREDSCRIPTS 
+
+.EXTERNALSCRIPTDEPENDENCIES 
+
+.RELEASENOTES
+
+
+#>
+
+<# 
+
+.DESCRIPTION 
+ Easily build PowerShell modules for a set of functions contained in individual PS1 files 
+
+#> 
+
+Param()
+
+
+Function Publish-PSModule {
+
     <#
     .SYNOPSIS
         Easily build PowerShell modules for a set of functions contained in individual PS1 files
@@ -67,143 +109,180 @@ Function Publish-PSModule
         Twitter:            @thesurlyadm1n
         Spiceworks:         Martin9700
         Blog:               www.thesurlyadmin.com
-      
-        Changelog:
-            1.0             Initial Release
-            1.0.9           Moved from RegEx to AST for function parsing
-            1.0.10          Updated comment based help.  Added Passthru parameter
-            1.0.11          Updated comment based help.  Exclude psake.ps1, build.ps1 and .psdeploy. from function import.
-                            Added BuildVersion
 
+        Changelog:
+        1.0             Initial Release
+        1.0.9           Moved from RegEx to AST for function parsing
+        1.0.10          Updated comment based help.  Added Passthru parameter
+        1.0.11          Updated comment based help.  Exclude psake.ps1, build.ps1 and .psdeploy. from function import.
+                        Added BuildVersion
+        1.0.12          Removed BuildVersion.  Added dynamic parameters from New-ModuleManifest.
     .LINK
         https://github.com/martin9700/Publish-PSModule
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory=$true)]
         [ValidateScript({ Test-Path $_ })]
         [string]$Path,
         [string]$ModuleName,
-        [version]$BuildVersion,
         [switch]$Passthru
     )
-    Write-Verbose "$(Get-Date): Publish-PSModule.ps1 started"
-
-    If (-not $ModuleName)
-    {
-        $ModuleName = Get-ItemProperty -Path $Path | Select -ExpandProperty BaseName
-    }
-
-    $Module = New-Object -TypeName System.Collections.ArrayList
-    $FunctionNames = New-Object -TypeName System.Collections.ArrayList
-    $FunctionPredicate = { ($args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst]) }
-    $HighVersion = [version]"2.0"
-
-    Write-Verbose "$(Get-Date): Searching for ps1 files and include.txt for module"
-    #Retrieve Include.txt file(s)
-    $Files = Get-ChildItem $Path\Include.txt -Recurse | Sort FullName
-    ForEach ($File in $Files)
-    {
-        $Raw = Get-Content $File
-        $null = $Module.Add($Raw)
-    }
-
-    #Retrieve ps1 files
-    $Files = Get-ChildItem $Path\*.ps1 -File -Recurse | Where FullName -NotMatch "Exclude|Tests|psake\.ps1|build\.ps1|\.psdeploy\." | Sort FullName
-    ForEach ($File in $Files)
-    {
-        $Raw = Get-Content $File -Raw
-        $Private = $false
-        If ($File.DirectoryName -like "*Private*")
+    DynamicParam {
+        # Create the dictionary that this scriptblock will return:
+        $DynParamDictionary = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+        $CommonParams = [System.Management.Automation.PSCmdlet]::CommonParameters
+        $CommonParams += [System.Management.Automation.PSCmdlet]::OptionalCommonParameters           
+            
+        # Get dynamic params that real Cmdlet would have:
+        $Parameters = Get-Command -Name New-ModuleManifest | Select-Object -ExpandProperty Parameters
+        ForEach ($Parameter in $Parameters.GetEnumerator()) 
         {
-            $Private = $true
-        }
-        $null = $Module.Add($Raw)
-
-        #Parse out the function names
-        #Thanks Zachary Loeber
-        $ParseError = $null
-        $Tokens = $null
-        $AST = [System.Management.Automation.Language.Parser]::ParseInput($Raw, [ref]$Tokens, [ref]$ParseError)
-        If ($ParseError)
-        {
-            Write-Error "Unable to parse $($File.FullName) because ""$ParseError""" -ErrorAction Stop
-        }
-
-        ForEach ($Name in ($AST.FindAll($FunctionPredicate, $true) | Select -ExpandProperty Name))
-        {
-            If ($FunctionNames.Name -contains $Name)
+            If ($CommonParams -notcontains $Parameter.Key)
             {
-                Write-Error "Your module has duplicate function names: $Name.  Duplicate found in $($File.FullName)" -ErrorAction Stop
+                $DynamicParameter = New-Object System.Management.Automation.RuntimeDefinedParameter (
+                    $Parameter.Key,
+                    $Parameter.Value.ParameterType,
+                    $Parameter.Value.Attributes
+                )
+                #Added in check to not add Name or NotificationEmail parameters because they are defined in static parameters
+                If (-not $DynParamDictionary.ContainsKey($Parameter.Key) -and $Parameter.Key -notmatch "Path|Passthru")
+                {
+                    $DynParamDictionary.Add($Parameter.Key, $DynamicParameter)
+                }
             }
-            Else
+        
+        }
+        # Return the dynamic parameters
+        Write-Host $DynParamDictionary
+        $DynParamDictionary
+    }
+
+    PROCESS {
+        Write-Verbose "$(Get-Date): Publish-PSModule.ps1 started"
+
+        If (-not $Path)
+        {
+            $Path = $PSScriptRoot
+        }
+
+        If (-not $ModuleName)
+        {
+            $ModuleName = Get-ItemProperty -Path $Path | Select -ExpandProperty BaseName
+        }
+
+        $Module = New-Object -TypeName System.Collections.ArrayList
+        $FunctionNames = New-Object -TypeName System.Collections.ArrayList
+        $FunctionPredicate = { ($args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst]) }
+        $HighVersion = [version]"2.0"
+
+        Write-Verbose "$(Get-Date): Searching for ps1 files and include.txt for module"
+        #Retrieve Include.txt file(s)
+        $Files = Get-ChildItem $Path\Include.txt -Recurse | Sort FullName
+        ForEach ($File in $Files)
+        {
+            $Raw = Get-Content $File
+            $null = $Module.Add($Raw)
+        }
+
+        #Retrieve ps1 files
+        $Files = Get-ChildItem $Path\*.ps1 -File -Recurse | Where FullName -NotMatch "Exclude|Tests|psake\.ps1|build\.ps1|\.psdeploy\." | Sort FullName
+        ForEach ($File in $Files)
+        {
+            $Raw = Get-Content $File -Raw
+            $Private = $false
+            If ($File.DirectoryName -like "*Private*")
             {
-                $null = $FunctionNames.Add([PSCustomObject]@{
-                    Name = $Name
-                    Private = $Private
-                })
+                $Private = $true
+            }
+            $null = $Module.Add($Raw)
+
+            #Parse out the function names
+            #Thanks Zachary Loeber
+            $ParseError = $null
+            $Tokens = $null
+            $AST = [System.Management.Automation.Language.Parser]::ParseInput($Raw, [ref]$Tokens, [ref]$ParseError)
+            If ($ParseError)
+            {
+                Write-Error "Unable to parse $($File.FullName) because ""$ParseError""" -ErrorAction Stop
+            }
+
+            ForEach ($Name in ($AST.FindAll($FunctionPredicate, $true) | Select -ExpandProperty Name))
+            {
+                If ($FunctionNames.Name -contains $Name)
+                {
+                    Write-Error "Your module has duplicate function names: $Name.  Duplicate found in $($File.FullName)" -ErrorAction Stop
+                }
+                Else
+                {
+                    $null = $FunctionNames.Add([PSCustomObject]@{
+                        Name = $Name
+                        Private = $Private
+                    })
+                }
+            }
+
+            If ($AST.ScriptRequirements.RequiredPSVersion -gt $HighVersion)
+            {
+                $HighVersion = $AST.ScriptRequirements.RequiredPSVersion
             }
         }
 
-        If ($AST.ScriptRequirements.RequiredPSVersion -gt $HighVersion)
+        #Create the manifest file
+        Write-Verbose "$(Get-Date): Creating/Updating module manifest and module file"
+        $Manifest = @{}
+        ForEach ($Key in ($PSBoundParameters.GetEnumerator() | Where { $_.Key -NotMatch "Path|Passthru|ModuleName" -and $CommonParams -notcontains $_.Key }))
         {
-            $HighVersion = $AST.ScriptRequirements.RequiredPSVersion
+            $Manifest.Add($Key.Key,$Key.Value)
         }
-    }
 
-    #Create the manifest file
-    Write-Verbose "$(Get-Date): Creating/Updating module manifest and module file"
-    $ManifestPath = Join-Path $Path -ChildPath "$ModuleName.psd1"
-    If (Test-Path $ManifestPath)
-    {
-        $OldManifest = Invoke-Expression -Command (Get-Content $ManifestPath -Raw)
-        If ([version]$OldManifest.PowerShellVersion -gt $HighVersion)
+        $ManifestPath = Join-Path $Path -ChildPath "$ModuleName.psd1"
+        If (Test-Path $ManifestPath)
         {
-            $HighVersion = [version]$OldManifest.PowerShellVersion
+            $OldManifest = Invoke-Expression -Command (Get-Content $ManifestPath -Raw)
+            If ([version]$OldManifest.PowerShellVersion -gt $HighVersion)
+            {
+                $HighVersion = [version]$OldManifest.PowerShellVersion
+            }
+            $Manifest.Path = $ManifestPath
+            $Manifest.PowerShellVersion = $HighVersion
+            $Manifest.FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
+            If ($BuildVersion)
+            {
+                $Manifest.Add("ModuleVersion",$BuildVersion)
+            }
+            Update-ModuleManifest @Manifest
         }
-        $Manifest = @{
-            Path = $ManifestPath
-            PowerShellVersion = $HighVersion
-            FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
-        }
-        If ($BuildVersion)
+        Else
         {
-            $Manifest.Add("ModuleVersion",$BuildVersion)
+            $Manifest.RootModule = $ModuleName
+            $Manifest.Path = $ManifestPath
+            $Manifest.PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
+            $Manifest.FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
+            If ($BuildVersion)
+            {
+                $Manifest.Add("ModuleVersion",$BuildVersion)
+            }
+            New-ModuleManifest @Manifest
         }
-        Update-ModuleManifest @Manifest
-    }
-    Else
-    {
-        $Manifest = @{
-            RootModule = $ModuleName
-            Path = $ManifestPath
-            PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
-            FunctionsToExport = $FunctionNames | Where Private -eq $false | Select -ExpandProperty Name
-        }
-        If ($BuildVersion)
+
+        #Save the Module file
+        $ModulePath = Join-Path -Path $Path -ChildPath "$ModuleName.psm1"
+        $Module | Out-File $ModulePath -Encoding ascii
+
+        #Passthru
+        If ($Passthru)
         {
-            $Manifest.Add("ModuleVersion",$BuildVersion)
+            [PSCustomObject]@{
+                Name             = $ModuleName
+                Path             = $Path
+                ManifestPath     = $ManifestPath
+                ModulePath       = $ModulePath
+                PublicFunctions  = @($FunctionNames | Where Private -eq $false | Select -ExpandProperty Name)
+                PrivateFunctions = @($FunctionNames | Where Private -eq $true | Select -ExpandProperty Name)
+            }
         }
-        New-ModuleManifest @Manifest
+
+        Write-Verbose "Module created at: $Path as $ModuleName" -Verbose
+        Write-Verbose "$(Get-Date): Publish-PSModule completed."
     }
-
-    #Save the Module file
-    $ModulePath = Join-Path -Path $Path -ChildPath "$ModuleName.psm1"
-    $Module | Out-File $ModulePath -Encoding ascii
-
-    #Passthru
-    If ($Passthru)
-    {
-        [PSCustomObject]@{
-            Name             = $ModuleName
-            Path             = $Path
-            ManifestPath     = $ManifestPath
-            ModulePath       = $ModulePath
-            PublicFunctions  = @($FunctionNames | Where Private -eq $false | Select -ExpandProperty Name)
-            PrivateFunctions = @($FunctionNames | Where Private -eq $true | Select -ExpandProperty Name)
-        }
-    }
-
-    Write-Verbose "Module created at: $Path as $ModuleName" -Verbose
-    Write-Verbose "$(Get-Date): Publish-PSModule completed."
 }
